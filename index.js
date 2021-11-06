@@ -18,10 +18,29 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
 
 
+const database = client.db("doctorsPortal_db");
+const doctorsCollection = database.collection("doctors");
+
+
+
+
 async function run(){
     try{
         await client.connect();
-        console.log('database connected');
+
+        //post doctor:
+        app.post('/doctors', async(req, res)=>{
+            const doctor = req.body;
+            const result = await doctorsCollection.insertOne(doctor);
+            res.json(result);
+        })
+        //get doctors:
+        app.get('/doctors', async(req, res)=>{
+            const cursor = doctorsCollection.find({});
+            const result = await cursor.toArray();
+            res.send(result);
+        })
+
     }
     finally{
         // await client.close();
