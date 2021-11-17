@@ -4,6 +4,10 @@ const cors = require('cors');
 require('dotenv').config();
 const { MongoClient } = require('mongodb');
 const admin = require("firebase-admin");
+const ObjectId = require('mongodb').ObjectId;
+const stripe = require("stripe")(process.env.STRIPE_SECRET);
+//fileUpload package:
+const fileUpload = require('express-fileupload');
 
 
 var serviceAccount = require("./doctors-portal-a687d-firebase-adminsdk-dp18h-4886f769c0.json");
@@ -39,6 +43,8 @@ const port = process.env.PORT || 4000;
 //MIDDLEWARE
 app.use(cors());
 app.use(express.json());
+//middleware to separate file from data:
+app.use(fileUpload());
 
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.a65gj.mongodb.net/myFirstDatabase?retryWrites=true&w=majority`;
@@ -60,7 +66,19 @@ async function run(){
 
         //post doctor:
         app.post('/doctors', async(req, res)=>{
-            const doctor = req.body;
+            const name = req.body.name;
+            const email = req.body.email;
+            /* image file post start */
+            const image = req.files.image;
+            const imgData = image.data;
+            const encodedImg = imgData.toString('base64');
+            const imgBuffer = Buffer.from(encodedImg, 'base64');
+            /* image file post end */
+            const doctor = {
+                name,
+                email,
+                photo: imgBuffer
+            }
             const result = await doctorsCollection.insertOne(doctor);
             res.json(result);
         })
@@ -151,6 +169,49 @@ async function run(){
             const cursor = usersAppointmentsCollection.find(query);
             const result = await cursor.toArray();
             res.send(result);
+        })
+        //all users appointments:
+        app.get('/usersAppointments', async(req, res)=>{
+            const cursor = usersAppointmentsCollection.find({});
+            const result = await cursor.toArray();
+            res.send(result);
+        })
+        //get specific appointment for payment:
+        app.get('/usersAppointments/:id', async(req, res)=>{
+            const id = req.params.id;
+            const query = {
+                _id: ObjectId(id)
+            };
+            const result = await usersAppointmentsCollection.findOne(query);
+            res.send(result);
+        })
+        // stripe payment:
+        app.post('/create-payment-intent', async(req, res)=>{
+            const paymentInfo = req.body;
+            const amount = paymentInfo.price*100;
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount: amount,
+                currency: 'usd',
+                payment_method_types: ['card'],
+            })
+            res.send({
+                clientSecret: paymentIntent.client_secret,
+            });
+        })
+
+        //update payment:
+        /* error: UnhandledPromiseRejectionWarning: Error: Invalid integer: NaN */
+        app.put('/userAppointments/:id', async(req, res)=>{
+            const id = req.params.id;
+            const payment = req.body;
+            const filter = {_id: ObjectId(id)};
+            const updateDoc = {
+                $set: {
+                    payment: payment,
+                }
+            }
+            const result = await usersAppointmentsCollection.updateOne(filter, updateDoc);
+            res.json(result);
         })
 
     }
