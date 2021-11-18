@@ -201,7 +201,7 @@ async function run(){
 
         //update payment:
         /* error: UnhandledPromiseRejectionWarning: Error: Invalid integer: NaN */
-        app.put('/userAppointments/:id', async(req, res)=>{
+        app.put('/usersAppointments/:id', async(req, res)=>{
             const id = req.params.id;
             const payment = req.body;
             const filter = {_id: ObjectId(id)};
